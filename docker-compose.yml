@@ -1,0 +1,58 @@
+services:
+  dochandler:
+    build: .
+    ports:
+      - "${FRONTEND_PORT:-3100}:3000"  # Frontend
+      - "${API_PORT:-8080}:8080"       # Backend API
+    volumes:
+      - ./data/vectors:/data/vectors
+      - ./data/db:/data/db
+    environment:
+      - NODE_ENV=production
+      - VECTORS_PATH=/data/vectors
+      - DB_PATH=/data/db
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://ollama:11434}
+      - PORT=3000
+      - API_PORT=8080
+    networks:
+      - local-handle
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Optional Ollama service - can be commented out if using external Ollama instance
+  ollama:
+    profiles:
+      - with-ollama
+    image: ollama/ollama:latest
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - local-handle
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
+    name: ollama_data
+
+networks:
+  local-handle:
+    name: local-handle
+    driver: bridge
